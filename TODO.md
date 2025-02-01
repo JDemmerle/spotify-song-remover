@@ -1,0 +1,2 @@
+- Update deprecated modules. For example request.
+- Show the current song inside the "remove from playlist" button
