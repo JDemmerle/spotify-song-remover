@@ -1,0 +1,264 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Example of the Authorization Code flow with Spotify</title>
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <style type="text/css">
+      #login, #loggedin {
+        display: none;
+      }
+      .text-overflow {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 500px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div id="login">
+        <h1>This is an example of the Authorization Code flow</h1>
+        <a href="/login" class="btn btn-primary">Log in with Spotify</a>
+      </div>
+      <div id="loggedin">
+        <div id="user-profile">
+        </div>
+        <div id="song-profile">
+        </div>
+        <div id="playlists-profile">
+        </div>
+        <div id="oauth">
+        </div>
+        <div id="song">
+        </div>
+        <button class="btn btn-default" id="obtain-new-token">Obtain new token using the refresh token</button>
+        <button class="btn btn-default" id="remove-song-from-playlist">Remove song from playlist</button>
+      </div>
+    </div>
+
+
+
+    <script id="user-profile-template" type="text/x-handlebars-template">
+      <h1>Logged in as {{display_name}}</h1>
+      <div class="media">
+        <div class="pull-left">
+          <img class="media-object" width="150" src="{{images.0.url}}" />
+        </div>
+        <div class="media-body">
+          <dl class="dl-horizontal">
+            <dt>Spotify URI</dt><dd><a href="{{external_urls.spotify}}">{{external_urls.spotify}}</a></dd>
+          </dl>
+        </div>
+      </div>
+    </script>
+
+    <script id="song-profile-template" type="text/x-handlebars-template">
+      <h1>Current song</h1>
+      <div class="media">
+        <div class="media-body">
+          <dl class="dl-horizontal">
+            <dt>Song name</dt><dd>{{item.name}}</dd>
+            <dt>Song ID</dt><dd>{{item.id}}</dd>
+            <dt>Type</dt><dd>{{context.type}}</dd>
+            <dt>Uri</dt><dd>{{context.uri}}</dd>
+          </dl>
+        </div>
+      </div>
+    </script>
+
+    <script id="playlists-profile-template" type="text/x-handlebars-template">
+      <h1>Playlist details</h1>
+      <div class="media">
+        <div class="media-body">
+          <dl class="dl-horizontal">
+            <dd>{{owner_message}}</dd>
+          </dl>
+        </div>
+      </div>
+    </script>
+
+    <script id="oauth-template" type="text/x-handlebars-template">
+      <h2>oAuth info</h2>
+      <dl class="dl-horizontal">
+        <dt>Access token</dt><dd class="text-overflow">{{access_token}}</dd>
+        <dt>Refresh token</dt><dd class="text-overflow">{{refresh_token}}</dd>
+      </dl>
+    </script>
+
+    <script id="song-template" type="text/x-handlebars-template">
+      <h2>Info</h2>
+      <dl class="dl-horizontal">
+        <dt>{{message}}</dd>
+      </dl>
+    </script>
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0-alpha.1/handlebars.min.js"></script>
+    <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+    <script>
+      (function() {
+
+        /**
+         * Obtains parameters from the hash of the URL
+         * @return Object
+         */
+        function getHashParams() {
+          var hashParams = {};
+          var e, r = /([^&;=]+)=?([^&;]*)/g,
+              q = window.location.hash.substring(1);
+          while ( e = r.exec(q)) {
+             hashParams[e[1]] = decodeURIComponent(e[2]);
+          }
+          return hashParams;
+        }
+
+        var userProfileSource = document.getElementById('user-profile-template').innerHTML,
+            userProfileTemplate = Handlebars.compile(userProfileSource),
+            userProfilePlaceholder = document.getElementById('user-profile');
+
+        var currentSongSource = document.getElementById('song-profile-template').innerHTML,
+            songProfileTemplate = Handlebars.compile(currentSongSource),
+            songProfilePlaceholder = document.getElementById('song-profile');
+
+        var playlistsSongSource = document.getElementById('playlists-profile-template').innerHTML,
+            playlistsProfileTemplate = Handlebars.compile(playlistsSongSource),
+            playlistsProfilePlaceholder = document.getElementById('playlists-profile');            
+
+        var oauthSource = document.getElementById('oauth-template').innerHTML,
+            oauthTemplate = Handlebars.compile(oauthSource),
+            oauthPlaceholder = document.getElementById('oauth');
+
+        var songRemove = document.getElementById('song-template').innerHTML,
+            songRemoveTemplate = Handlebars.compile(songRemove),
+            songRemovePlaceholder = document.getElementById('song');
+
+        var params = getHashParams();
+
+        var access_token = params.access_token,
+            refresh_token = params.refresh_token,
+            error = params.error;
+
+        if (error) {
+          alert('There was an error during the authentication');
+        } else {
+          if (access_token) {
+            // render oauth info
+            oauthPlaceholder.innerHTML = oauthTemplate({
+              access_token: access_token,
+              refresh_token: refresh_token
+            });
+
+            // Fetch user details
+            $.ajax({
+                url: 'https://api.spotify.com/v1/me',
+                headers: {
+                  'Authorization': 'Bearer ' + access_token
+                },
+                success: function(response) {
+                  userProfilePlaceholder.innerHTML = userProfileTemplate(response);
+                  currentUserId = response.id;
+
+                  $('#login').hide();
+                  $('#loggedin').show();
+                }
+            });
+
+            // Fetch song details
+            $.ajax({
+                url: 'https://api.spotify.com/v1/me/player',
+                headers: {
+                  'Authorization': 'Bearer ' + access_token
+                },
+                success: function(response) {
+                  // console.log(response);
+
+                  songID = response.item.id;
+                  playlistID = response.context.uri.split(":").pop();
+                  songProfilePlaceholder.innerHTML = songProfileTemplate(response);
+
+                  $('#login').hide();
+                  $('#loggedin').show();
+
+                  // Fetch playlist details
+                  $.ajax({
+                      url: 'https://api.spotify.com/v1/playlists/'+playlistID,
+                      headers: {
+                          'Authorization': 'Bearer ' + access_token
+                      },
+                      success: function(response) {
+                          // console.log(response);
+
+                          // Check if the playlist owner matches the current user
+                          const isOwner = response.owner.id === currentUserId;
+                          const ownerMessage = isOwner ? "Dir gehört die Playlist - " : "Diese Playlist gehört: " + response.owner.display_name + " - ";
+
+                          // Display owner information
+                          playlistsProfilePlaceholder.innerHTML = playlistsProfileTemplate({
+                              owner_message: ownerMessage+" "+playlistID
+                          });
+
+                          $('#login').hide();
+                          $('#loggedin').show();
+                      },
+                      error: function(response){
+                        playlistsProfilePlaceholder.innerHTML = playlistsProfileTemplate({
+                              owner_message: "Eine von Spotify erstelle Playlist."
+                          });
+                      },
+                  });
+                }
+            });
+          } else {
+              // render initial screen
+              $('#login').show();
+              $('#loggedin').hide();
+          }
+
+          document.getElementById('obtain-new-token').addEventListener('click', function() {
+            $.ajax({
+              url: '/refresh_token',
+              data: {
+                'refresh_token': refresh_token
+              }
+            }).done(function(data) {
+              access_token = data.access_token;
+              oauthPlaceholder.innerHTML = oauthTemplate({
+                access_token: access_token,
+                refresh_token: refresh_token
+              });
+            });
+          }, false);
+
+
+          // Alles von oben Auslagern nach App.js damit man das ohne Seitenreload abschicken kann und dann die richtigen IDs hat.
+          // Alternativ oben den kram in eine Funktion packaen und neu ausführen lassen wenn der button geklickt wird. Dann hat man auch die neuen infos und muss keine app.js magie machen
+          document.getElementById('remove-song-from-playlist').addEventListener('click', function() {
+            location.reload();
+            // console.log(songID);
+            // console.log(playlistID);
+            $.ajax({
+              type: 'DELETE',
+              url: 'https://api.spotify.com/v1/playlists/'+playlistID+'/tracks',
+              data: JSON.stringify({
+                tracks: [
+                  {
+                      uri: "spotify:track:"+songID
+                  }
+                ]
+              }),
+              headers: {
+                  'Authorization': 'Bearer ' + access_token,
+                  'Content-Type': 'application/json'
+              }
+            }).done(function(data) {
+              songRemovePlaceholder.innerHTML = songRemoveTemplate({message: "Song removed! :)"});
+            });
+          }, false);
+
+        }
+      })();
+    </script>
+  </body>
+</html>
+
