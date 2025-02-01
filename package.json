@@ -1,8 +1,8 @@
 {
-  "name": "spotify-authorization-code-example",
-  "version": "0.0.2",
-  "description": "Spotify Authorization Code flow example",
-  "author": "Spotify",
+  "name": "spotify-song-remover",
+  "version": "1.0.0",
+  "description": "This program removes the current running song from the playlist.",
+  "author": "Jonathan Demmerle",
   "scripts": {
     "start": "node app.js"
   },
