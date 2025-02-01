@@ -2,9 +2,9 @@
 <html>
   <head>
     <title>Example of the Authorization Code flow with Spotify</title>
-    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     <style type="text/css">
-      #login, #loggedin {
+      #login, #loggedin, #debug{
         display: none;
       }
       .text-overflow {
@@ -22,34 +22,35 @@
         <h1>This is an example of the Authorization Code flow</h1>
         <a href="/login" class="btn btn-primary">Log in with Spotify</a>
       </div>
+     
       <div id="loggedin">
         <div id="user-profile">
         </div>
-        <div id="song-profile">
+        <div id="debug">
+          <div id="song-profile">
+          </div>
+          <div id="playlists-profile">
+          </div>
+          <div id="oauth">
+          </div>
+          <div id="song">
+          </div>
+          <button class="btn btn-secondary btn-lg" id="obtain-new-token">Obtain new token using the refresh token</button>
+        </div> 
+        <div class="d-grid gap-2"></div>
+          <button type="button" class="btn btn-primary btn-lg" id="remove-song-from-playlist">Lösche Song von aktueller Playlist</button>
         </div>
-        <div id="playlists-profile">
-        </div>
-        <div id="oauth">
-        </div>
-        <div id="song">
-        </div>
-        <button class="btn btn-default" id="obtain-new-token">Obtain new token using the refresh token</button>
-        <button class="btn btn-default" id="remove-song-from-playlist">Remove song from playlist</button>
       </div>
+      
     </div>
 
 
 
     <script id="user-profile-template" type="text/x-handlebars-template">
-      <h1>Logged in as {{display_name}}</h1>
+      <h1>Eingeloggt als {{display_name}}</h1>
       <div class="media">
         <div class="pull-left">
           <img class="media-object" width="150" src="{{images.0.url}}" />
-        </div>
-        <div class="media-body">
-          <dl class="dl-horizontal">
-            <dt>Spotify URI</dt><dd><a href="{{external_urls.spotify}}">{{external_urls.spotify}}</a></dd>
-          </dl>
         </div>
       </div>
     </script>
@@ -98,165 +99,175 @@
     <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
     <script>
       (function() {
-
-        /**
-         * Obtains parameters from the hash of the URL
-         * @return Object
-         */
-        function getHashParams() {
-          var hashParams = {};
-          var e, r = /([^&;=]+)=?([^&;]*)/g,
-              q = window.location.hash.substring(1);
-          while ( e = r.exec(q)) {
-             hashParams[e[1]] = decodeURIComponent(e[2]);
-          }
-          return hashParams;
-        }
-
-        var userProfileSource = document.getElementById('user-profile-template').innerHTML,
-            userProfileTemplate = Handlebars.compile(userProfileSource),
-            userProfilePlaceholder = document.getElementById('user-profile');
-
-        var currentSongSource = document.getElementById('song-profile-template').innerHTML,
-            songProfileTemplate = Handlebars.compile(currentSongSource),
-            songProfilePlaceholder = document.getElementById('song-profile');
-
-        var playlistsSongSource = document.getElementById('playlists-profile-template').innerHTML,
-            playlistsProfileTemplate = Handlebars.compile(playlistsSongSource),
-            playlistsProfilePlaceholder = document.getElementById('playlists-profile');            
-
-        var oauthSource = document.getElementById('oauth-template').innerHTML,
-            oauthTemplate = Handlebars.compile(oauthSource),
-            oauthPlaceholder = document.getElementById('oauth');
-
-        var songRemove = document.getElementById('song-template').innerHTML,
-            songRemoveTemplate = Handlebars.compile(songRemove),
-            songRemovePlaceholder = document.getElementById('song');
-
-        var params = getHashParams();
-
-        var access_token = params.access_token,
-            refresh_token = params.refresh_token,
-            error = params.error;
-
-        if (error) {
-          alert('There was an error during the authentication');
-        } else {
-          if (access_token) {
-            // render oauth info
-            oauthPlaceholder.innerHTML = oauthTemplate({
-              access_token: access_token,
-              refresh_token: refresh_token
-            });
-
-            // Fetch user details
-            $.ajax({
-                url: 'https://api.spotify.com/v1/me',
-                headers: {
-                  'Authorization': 'Bearer ' + access_token
-                },
-                success: function(response) {
-                  userProfilePlaceholder.innerHTML = userProfileTemplate(response);
-                  currentUserId = response.id;
-
-                  $('#login').hide();
-                  $('#loggedin').show();
-                }
-            });
-
-            // Fetch song details
-            $.ajax({
-                url: 'https://api.spotify.com/v1/me/player',
-                headers: {
-                  'Authorization': 'Bearer ' + access_token
-                },
-                success: function(response) {
-                  // console.log(response);
-
-                  songID = response.item.id;
-                  playlistID = response.context.uri.split(":").pop();
-                  songProfilePlaceholder.innerHTML = songProfileTemplate(response);
-
-                  $('#login').hide();
-                  $('#loggedin').show();
-
-                  // Fetch playlist details
-                  $.ajax({
-                      url: 'https://api.spotify.com/v1/playlists/'+playlistID,
-                      headers: {
-                          'Authorization': 'Bearer ' + access_token
-                      },
-                      success: function(response) {
-                          // console.log(response);
-
-                          // Check if the playlist owner matches the current user
-                          const isOwner = response.owner.id === currentUserId;
-                          const ownerMessage = isOwner ? "Dir gehört die Playlist - " : "Diese Playlist gehört: " + response.owner.display_name + " - ";
-
-                          // Display owner information
-                          playlistsProfilePlaceholder.innerHTML = playlistsProfileTemplate({
-                              owner_message: ownerMessage+" "+playlistID
-                          });
-
-                          $('#login').hide();
-                          $('#loggedin').show();
-                      },
-                      error: function(response){
-                        playlistsProfilePlaceholder.innerHTML = playlistsProfileTemplate({
-                              owner_message: "Eine von Spotify erstelle Playlist."
-                          });
-                      },
-                  });
-                }
-            });
-          } else {
-              // render initial screen
-              $('#login').show();
-              $('#loggedin').hide();
-          }
-
-          document.getElementById('obtain-new-token').addEventListener('click', function() {
-            $.ajax({
-              url: '/refresh_token',
-              data: {
-                'refresh_token': refresh_token
+          function getHashParams() {
+              var hashParams = {};
+              var e, r = /([^&;=]+)=?([^&;]*)/g,
+                  q = window.location.hash.substring(1);
+              while (e = r.exec(q)) {
+                  hashParams[e[1]] = decodeURIComponent(e[2]);
               }
-            }).done(function(data) {
-              access_token = data.access_token;
-              oauthPlaceholder.innerHTML = oauthTemplate({
-                access_token: access_token,
-                refresh_token: refresh_token
+              return hashParams;
+          }
+
+          // HTML variables
+          var userProfileTemplate = Handlebars.compile(document.getElementById('user-profile-template').innerHTML),
+              userProfilePlaceholder = document.getElementById('user-profile');
+
+          var songProfileTemplate = Handlebars.compile(document.getElementById('song-profile-template').innerHTML),
+              songProfilePlaceholder = document.getElementById('song-profile');
+
+          var playlistsProfileTemplate = Handlebars.compile(document.getElementById('playlists-profile-template').innerHTML),
+              playlistsProfilePlaceholder = document.getElementById('playlists-profile');
+
+          var oauthTemplate = Handlebars.compile(document.getElementById('oauth-template').innerHTML),
+              oauthPlaceholder = document.getElementById('oauth');
+
+          var songRemoveTemplate = Handlebars.compile(document.getElementById('song-template').innerHTML),
+              songRemovePlaceholder = document.getElementById('song');
+
+          // Auth variables
+          var params = getHashParams();
+          var access_token = params.access_token,
+              refresh_token = params.refresh_token,
+              error = params.error;
+
+          if (error) {
+              alert('Es gab einen Fehler während der Authentifizierung!');
+              return;
+          }
+
+          // Spotify-API request helper function
+          function spotifyRequest(endpoint, method = 'GET', data = null) {
+              return $.ajax({
+                  type: method,
+                  url: `https://api.spotify.com/v1/${endpoint}`,
+                  headers: { 'Authorization': 'Bearer ' + access_token },
+                  data: data ? JSON.stringify(data) : null,
+                  contentType: data ? 'application/json' : undefined
+              }).fail(function(error) {
+                  console.error(`Fehler bei ${method} ${endpoint}:`, error.responseJSON || error);
               });
-            });
-          }, false);
+          }
 
+          function getUserProfile() {
+              return spotifyRequest('me')
+                  .done(function(response) {
+                      userProfilePlaceholder.innerHTML = userProfileTemplate(response);
+                      currentUserId = response.id;
+                      $('#login').hide();
+                      $('#loggedin').show();
+                  });
+          }
 
-          // Alles von oben Auslagern nach App.js damit man das ohne Seitenreload abschicken kann und dann die richtigen IDs hat.
-          // Alternativ oben den kram in eine Funktion packaen und neu ausführen lassen wenn der button geklickt wird. Dann hat man auch die neuen infos und muss keine app.js magie machen
-          document.getElementById('remove-song-from-playlist').addEventListener('click', function() {
-            location.reload();
-            // console.log(songID);
-            // console.log(playlistID);
-            $.ajax({
-              type: 'DELETE',
-              url: 'https://api.spotify.com/v1/playlists/'+playlistID+'/tracks',
-              data: JSON.stringify({
-                tracks: [
-                  {
-                      uri: "spotify:track:"+songID
-                  }
-                ]
-              }),
-              headers: {
-                  'Authorization': 'Bearer ' + access_token,
-                  'Content-Type': 'application/json'
+          function getCurrentSong() {
+              return spotifyRequest('me/player')
+                  .done(function(response) {
+                      if (!response || !response.item) {
+                          console.warn("Aktuell läuft kein Song");
+                          return;
+                      }
+                      songID = response.item.id;
+                      playlistID = response.context?.uri?.split(":").pop() || null;
+                      songProfilePlaceholder.innerHTML = songProfileTemplate(response);
+
+                      if (playlistID) {
+                          getPlaylistDetails(playlistID);
+                      }
+                  });
+          }
+
+          function getPlaylistDetails(playlistID) {
+              return spotifyRequest(`playlists/${playlistID}`)
+                  .done(function(response) {
+                      const isOwner = response.owner.id === currentUserId;
+                      const ownerMessage = isOwner
+                          ? `Dir gehört die Playlist!`
+                          : `Diese Playlist gehört: ${response.owner.display_name} und kann daher nicht bearbeitet werden!`;
+
+                      playlistsProfilePlaceholder.innerHTML = playlistsProfileTemplate({
+                          owner_message: ownerMessage
+                      });
+                  })
+                  .fail(function() {
+                      playlistsProfilePlaceholder.innerHTML = playlistsProfileTemplate({
+                          owner_message: "Diese Playlist wurde von Spotify erstellt und kann daher nicht bearbeitet werden!"
+                      });
+                  });
+          }
+
+          function removeSongFromPlaylist() {
+              if (!songID || !playlistID) {
+                  alert("Es konnte kein Song oder keine Playlist gefunden werden.");
+                  return;
               }
-            }).done(function(data) {
-              songRemovePlaceholder.innerHTML = songRemoveTemplate({message: "Song removed! :)"});
-            });
+
+              console.log(`Entferne Song ${songID} aus Playlist ${playlistID}`);
+
+              return spotifyRequest(`playlists/${playlistID}/tracks`, 'DELETE', {
+                  tracks: [{ uri: "spotify:track:" + songID }]
+              }).done(function() {
+                  songRemovePlaceholder.innerHTML = songRemoveTemplate({
+                      message: "Song wurde entfernt! :)"
+                  });
+              });
+          }
+
+          function skipToNextSong() {
+              return spotifyRequest(`me/player/next`, 'POST')
+                .done(function() {
+                  console.log(`Nächster Song wird abgespielt.`);
+                  songRemovePlaceholder.innerHTML = songRemoveTemplate({
+                      message: "Song wurde entfernt! :)"
+                  });
+              });
+          }
+
+          function getCurrentDevice() {
+              return spotifyRequest(`me/player/devices`)
+                .done(function(response) {
+                  console.log("Aktive Geräte:", response.devices);
+              });
+          }
+
+          function obtainNewToken() {
+              $.ajax({
+                  url: '/refresh_token',
+                  data: { 'refresh_token': refresh_token }
+              }).done(function(data) {
+                  access_token = data.access_token;
+                  oauthPlaceholder.innerHTML = oauthTemplate({
+                      access_token: access_token,
+                      refresh_token: refresh_token
+                  });
+              });
+          }
+
+          // Event-Listener for renew token button
+          document.getElementById('obtain-new-token').addEventListener('click', obtainNewToken, false);
+
+          // Event-Listener for remove song button
+          document.getElementById('remove-song-from-playlist').addEventListener('click', function() {
+              // getCurrentSong(); // TODO: That does not work like this. We always need the current song id
+              removeSongFromPlaylist();
+              skipToNextSong();
           }, false);
 
-        }
+          function initializeApp() {
+              if (access_token) {
+                  oauthPlaceholder.innerHTML = oauthTemplate({
+                      access_token: access_token,
+                      refresh_token: refresh_token
+                  });
+                  // getCurrentDevice();
+                  getUserProfile().then(getCurrentSong);
+                  $('#debug').show(); // Enables/disables debug infos
+              } else {
+                  $('#login').show();
+                  $('#loggedin').hide();
+              }
+          }
+
+          initializeApp();
       })();
     </script>
   </body>
