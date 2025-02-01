@@ -1,7 +1,7 @@
 <!doctype html>
 <html>
   <head>
-    <title>Example of the Authorization Code flow with Spotify</title>
+    <title>Playlist song remover</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     <style type="text/css">
       #login, #loggedin, #debug{
@@ -13,20 +13,25 @@
         white-space: nowrap;
         width: 500px;
       }
+      .full-btn {
+            width: 100%;
+            height: 50vh; /* Halbe Höhe der Seite */
+            font-size: 2rem; /* Größerer Text */
+        }
     </style>
   </head>
 
   <body>
     <div class="container">
       <div id="login">
-        <h1>This is an example of the Authorization Code flow</h1>
+        <h1>Login with spotify to use the playlist song remover.</h1>
         <a href="/login" class="btn btn-primary">Log in with Spotify</a>
       </div>
      
       <div id="loggedin">
-        <div id="user-profile">
-        </div>
         <div id="debug">
+          <div id="user-profile">
+          </div>
           <div id="song-profile">
           </div>
           <div id="playlists-profile">
@@ -37,8 +42,10 @@
           </div>
           <button class="btn btn-secondary btn-lg" id="obtain-new-token">Obtain new token using the refresh token</button>
         </div> 
-        <div class="d-grid gap-2"></div>
-          <button type="button" class="btn btn-primary btn-lg" id="remove-song-from-playlist">Lösche Song von aktueller Playlist</button>
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-primary full-btn btn-danger" id="remove-song-from-playlist">Lösche Song aus Playlist</button>
+          <br>
+          <button type="button" class="btn btn-primary full-btn btn-primary" id="next-song">Nächster Song</button>
         </div>
       </div>
       
@@ -124,6 +131,8 @@
 
           var songRemoveTemplate = Handlebars.compile(document.getElementById('song-template').innerHTML),
               songRemovePlaceholder = document.getElementById('song');
+
+
 
           // Auth variables
           var params = getHashParams();
@@ -246,11 +255,17 @@
           document.getElementById('obtain-new-token').addEventListener('click', obtainNewToken, false);
 
           // Event-Listener for remove song button
-          document.getElementById('remove-song-from-playlist').addEventListener('click', function() {
-              // getCurrentSong(); // TODO: That does not work like this. We always need the current song id
-              removeSongFromPlaylist();
-              skipToNextSong();
+          document.getElementById('remove-song-from-playlist').addEventListener('click', async function() {
+            try {
+                await getCurrentSong();
+                await removeSongFromPlaylist();
+                await  skipToNextSong();
+            } catch (error) {
+                console.error("Fehler:", error);
+            }              
           }, false);
+
+          document.getElementById('next-song').addEventListener('click', skipToNextSong, false);
 
           function initializeApp() {
               if (access_token) {
@@ -260,7 +275,7 @@
                   });
                   // getCurrentDevice();
                   getUserProfile().then(getCurrentSong);
-                  $('#debug').show(); // Enables/disables debug infos
+                  $('#debug').hide(); // Enables/disables debug infos
               } else {
                   $('#login').show();
                   $('#loggedin').hide();
