@@ -17,6 +17,7 @@ var cookieParser = require('cookie-parser');
 var client_id = process.env.SPOTIFY_CLIENT_ID;
 var client_secret = process.env.SPOTIFY_CLIENT_SECRET;
 var redirect_uri = process.env.SPOTIFY_REDIRECT_URL || 'http://localhost:8888/callback';
+var listen_host =  process.env.LISTEN_HOST || '127.0.0.1';
 
 
 const generateRandomString = (length) => {
@@ -143,4 +144,4 @@ app.get('/refresh_token', function(req, res) {
 });
 
 console.log('Listening on 8888');
-app.listen(8888);
+app.listen(8888, listen_host);
