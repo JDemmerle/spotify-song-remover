@@ -1,27 +1,22 @@
-# Spotify Authorization Code example
+# Spotify song remover
 
-This app displays your Spotify profile information using [Authorization Code](https://developer.spotify.com/documentation/web-api/tutorials/code-flow)
-to grant permissions to the app.
+This app removes the current playing song from the currently playing playlist.
 
 ## Installation
 
-This example runs on Node.js. On [its website](http://www.nodejs.org/download/) you can find instructions on how to install it.
-
 Install the app dependencies running:
-
-    $ npm install
+```bash
+npm install
+```
 
 ## Using your own credentials
 
-You will need to register your app and get your own credentials from the [Spotify for Developers Dashboard](https://developer.spotify.com/dashboard).
+During development:
+```bash
+SPOTIFY_CLIENT_ID=xxxxxx SPOTIFY_CLIENT_SECRET=xxxxxx npm start dev
+```
 
-- Create a new app in the dashboard and add `http://localhost:8888/callback` to the app's redirect URL list.
-- Once you have created your app, update the `client_id`, `redirect_uri`, and `client_secret` in the `app.js` file with the credentials obtained from the app settings in the dashboard.
-
-## Running the example
-
-From a console shell:
-
-    $ npm start
-
-Then, open `http://localhost:8888` in a browser.
+Running productive (use systemd)
+```bash
+SPOTIFY_CLIENT_ID=xxxxxx SPOTIFY_CLIENT_SECRET=xxxxxx SPOTIFY_REDIRECT_URL=https://example.de/callback npm start dev
+```
