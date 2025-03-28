@@ -1,6 +1,6 @@
 # Spotify song remover
 
-This app removes the current playing song from the currently playing playlist.
+This app removes the current playing song from the currently playing playlist by simply touch a button on a website (included in this project)
 
 ## Installation
 
