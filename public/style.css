@@ -1,0 +1,170 @@
+:root {
+  --bg: #121212;
+  --surface: #1e1e1e;
+  --text: #ffffff;
+  --muted: #b3b3b3;
+  --green: #1db954;
+  --green-hover: #1ed760;
+  --red: #d32f2f;
+  --blue: #1565c0;
+  --gap: 12px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+main {
+  /* dvh avoids the jump of the mobile browser address bar, vh is the fallback */
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+           max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 16px;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform .1s ease, filter .15s ease, opacity .15s ease;
+}
+
+.btn:active {
+  transform: scale(.98);
+}
+
+.btn:focus-visible {
+  outline: 3px solid var(--text);
+  outline-offset: 3px;
+}
+
+.btn:disabled {
+  opacity: .5;
+  cursor: wait;
+}
+
+/* Login */
+
+.login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 32px 24px;
+  border-radius: 24px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.login-card h1 {
+  margin: 0 0 12px;
+  font-size: clamp(1.5rem, 6vw, 2rem);
+}
+
+.login-card p {
+  margin: 0 0 28px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.btn-login {
+  width: 100%;
+  min-height: 56px;
+  border-radius: 999px;
+  background: var(--green);
+  color: #000;
+  font-size: 1.125rem;
+}
+
+.btn-login:hover {
+  background: var(--green-hover);
+}
+
+/* Main view: status line + two buttons sharing the remaining height */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  height: 100vh;
+  height: 100dvh;
+}
+
+.status {
+  margin: 0;
+  min-height: 1.5em;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  min-height: 0;
+}
+
+.btn-action {
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+  font-size: clamp(1.5rem, 7vmin, 4rem);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.btn-remove {
+  background: var(--red);
+}
+
+.btn-next {
+  background: var(--blue);
+}
+
+@media (hover: hover) {
+  .btn-action:hover {
+    filter: brightness(1.1);
+  }
+}
+
+/* Landscape phones / wide screens: buttons side by side */
+@media (orientation: landscape) {
+  .actions {
+    flex-direction: row;
+  }
+}

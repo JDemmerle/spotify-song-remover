@@ -8,9 +8,9 @@
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
-    "cors": "2.8.5",
-    "express": "^4.21.2",
-    "querystring": "~0.2.0",
-    "request": "2.88.2"
+    "express": "^4.22.3"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

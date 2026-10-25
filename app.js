@@ -1,69 +1,101 @@
 /**
- * This is an example of a basic node.js script that performs
- * the Authorization Code oAuth2 flow to authenticate against
- * the Spotify Accounts.
+ * Backend for the Spotify song remover.
  *
- * For more information, read
+ * Only handles the Authorization Code oAuth2 flow against the Spotify
+ * Accounts service, so the client secret never leaves the server.
+ * The browser talks to the Spotify Web API directly (see public/main.js).
+ *
  * https://developer.spotify.com/documentation/web-api/tutorials/code-flow
  */
 
 var express = require('express');
-var request = require('request');
 var crypto = require('crypto');
-var cors = require('cors');
-var querystring = require('querystring');
 var cookieParser = require('cookie-parser');
 
 var client_id = process.env.SPOTIFY_CLIENT_ID;
 var client_secret = process.env.SPOTIFY_CLIENT_SECRET;
-var redirect_uri = process.env.SPOTIFY_REDIRECT_URL || 'http://localhost:8888/callback';
-var listen_host =  process.env.LISTEN_HOST || '127.0.0.1';
+// Spotify no longer accepts "localhost" as redirect URI, only HTTPS or loopback IPs
+var redirect_uri = process.env.SPOTIFY_REDIRECT_URL || 'http://127.0.0.1:8888/callback';
+var listen_host = process.env.LISTEN_HOST || '127.0.0.1';
+var port = 8888;
 
-
-const generateRandomString = (length) => {
-  return crypto
-  .randomBytes(60)
-  .toString('hex')
-  .slice(0, length);
+if (!client_id || !client_secret) {
+  console.error('SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET must be set');
+  process.exit(1);
 }
 
+var isHttps = redirect_uri.startsWith('https://');
 var stateKey = 'spotify_auth_state';
+var scope = 'user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public';
+var basicAuth = 'Basic ' + Buffer.from(client_id + ':' + client_secret).toString('base64');
 
-var app = express();
-const HEADERS = {
-  "Content-Security-Policy":
-    "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+var CSP = [
+  "default-src 'self'",
+  "connect-src 'self' https://api.spotify.com",
+  "img-src 'self' data:",
+  "style-src 'self'",
+  "script-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'"
+];
+if (isHttps) CSP.push('upgrade-insecure-requests');
+
+var HEADERS = {
+  "Content-Security-Policy": CSP.join(';'),
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Resource-Policy": "same-origin",
   "Origin-Agent-Cluster": "?1",
   "Referrer-Policy": "no-referrer",
-  "Strict-Transport-Security": "max-age=15552000; includeSubDomains",
   "X-Content-Type-Options": "nosniff",
   "X-DNS-Prefetch-Control": "off",
-  "X-Download-Options": "noopen",
-  "X-Frame-Options": "SAMEORIGIN",
+  "X-Frame-Options": "DENY",
   "X-Permitted-Cross-Domain-Policies": "none",
   "X-XSS-Protection": "0",
 };
+// HSTS is ignored on plain HTTP anyway, only send it behind TLS
+if (isHttps) HEADERS["Strict-Transport-Security"] = "max-age=15552000; includeSubDomains";
 
-app.use(express.static(__dirname + '/public'))
-   .use(cors())
-   .use(cookieParser());
-  //  .use(helmet());
+var app = express();
+app.disable('x-powered-by');
 
+app.use(function(req, res, next) {
+  res.set(HEADERS);
+  next();
+});
+app.use(express.static(__dirname + '/public'));
+app.use(cookieParser());
+app.use(express.json({ limit: '2kb' }));
 
-app.disable("x-powered-by");
-
+// Requests a token from the Spotify Accounts service
+async function requestToken(params) {
+  var response = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': basicAuth
+    },
+    body: new URLSearchParams(params),
+    signal: AbortSignal.timeout(10000)
+  });
+  if (!response.ok) {
+    throw new Error('Token request failed with status ' + response.status);
+  }
+  return response.json();
+}
 
 app.get('/login', function(req, res) {
-  res.set(HEADERS);
-  var state = generateRandomString(16);
-  res.cookie(stateKey, state);
+  var state = crypto.randomBytes(16).toString('hex');
+  res.cookie(stateKey, state, {
+    httpOnly: true,
+    secure: isHttps,
+    sameSite: 'lax',
+    maxAge: 10 * 60 * 1000
+  });
 
-  // your application requests authorization
-  var scope = 'user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public';
   res.redirect('https://accounts.spotify.com/authorize?' +
-    querystring.stringify({
+    new URLSearchParams({
       response_type: 'code',
       client_id: client_id,
       scope: scope,
@@ -72,85 +104,62 @@ app.get('/login', function(req, res) {
     }));
 });
 
-app.get('/callback', function(req, res) {
-
-  // your application requests refresh and access tokens
-  // after checking the state parameter
-
-  var code = req.query.code || null;
-  var state = req.query.state || null;
+app.get('/callback', async function(req, res) {
+  var code = typeof req.query.code === 'string' ? req.query.code : null;
+  var state = typeof req.query.state === 'string' ? req.query.state : null;
   var storedState = req.cookies ? req.cookies[stateKey] : null;
 
-  if (state === null || state !== storedState) {
-    res.redirect('/#' +
-      querystring.stringify({
-        error: 'state_mismatch'
-      }));
-  } else {
-    res.clearCookie(stateKey);
-    var authOptions = {
-      url: 'https://accounts.spotify.com/api/token',
-      form: {
-        code: code,
-        redirect_uri: redirect_uri,
-        grant_type: 'authorization_code'
-      },
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded',
-        Authorization: 'Basic ' + (new Buffer.from(client_id + ':' + client_secret).toString('base64'))
-      },
-      json: true
-    };
+  res.clearCookie(stateKey);
 
-    request.post(authOptions, function(error, response, body) {
-      if (!error && response.statusCode === 200) {
+  if (!code || !state || state !== storedState) {
+    return res.redirect('/#' + new URLSearchParams({ error: 'state_mismatch' }));
+  }
 
-        var access_token = body.access_token,
-            refresh_token = body.refresh_token;
-
-        // we can also pass the token to the browser to make requests from there
-        res.redirect('/#' +
-          querystring.stringify({
-            access_token: access_token,
-            refresh_token: refresh_token
-          }));
-      } else {
-        res.redirect('/#' +
-          querystring.stringify({
-            error: 'invalid_token'
-          }));
-      }
+  try {
+    var body = await requestToken({
+      code: code,
+      redirect_uri: redirect_uri,
+      grant_type: 'authorization_code'
     });
+    // Tokens are passed in the URL fragment, which is never sent to the server.
+    // The frontend removes it from the address bar right away.
+    res.redirect('/#' + new URLSearchParams({
+      access_token: body.access_token,
+      refresh_token: body.refresh_token
+    }));
+  } catch (err) {
+    console.error(err.message);
+    res.redirect('/#' + new URLSearchParams({ error: 'invalid_token' }));
   }
 });
 
-app.get('/refresh_token', function(req, res) {
+// POST instead of GET so the refresh token does not end up in proxy access logs
+app.post('/refresh_token', async function(req, res) {
+  var refresh_token = req.body && req.body.refresh_token;
+  if (typeof refresh_token !== 'string' || !refresh_token) {
+    return res.status(400).send({ error: 'missing_refresh_token' });
+  }
 
-  var refresh_token = req.query.refresh_token;
-  var authOptions = {
-    url: 'https://accounts.spotify.com/api/token',
-    headers: { 
-      'content-type': 'application/x-www-form-urlencoded',
-      'Authorization': 'Basic ' + (new Buffer.from(client_id + ':' + client_secret).toString('base64')) 
-    },
-    form: {
+  try {
+    var body = await requestToken({
       grant_type: 'refresh_token',
       refresh_token: refresh_token
-    },
-    json: true
-  };
-
-  request.post(authOptions, function(error, response, body) {
-    if (!error && response.statusCode === 200) {
-      var access_token = body.access_token,
-          refresh_token = body.refresh_token;
-      res.send({
-        'access_token': access_token,
-        'refresh_token': refresh_token
-      });
-    }
-  });
+    });
+    res.set('Cache-Control', 'no-store');
+    res.send({
+      access_token: body.access_token,
+      // Spotify only sometimes rotates the refresh token
+      refresh_token: body.refresh_token || refresh_token
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(401).send({ error: 'invalid_refresh_token' });
+  }
 });
 
-console.log('Listening on '+listen_host+':8888');
-app.listen(8888, listen_host);
+app.listen(port, listen_host, function() {
+  console.log('Listening on ' + listen_host + ':' + port);
+}).on('error', function(err) {
+  console.error('Error in server setup: ' + err.message);
+  process.exit(1);
+});

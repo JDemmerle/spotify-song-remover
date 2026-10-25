@@ -13,8 +13,11 @@ npm install
 
 ### During development
 ```bash
-SPOTIFY_CLIENT_ID=xxxxxx SPOTIFY_CLIENT_SECRET=xxxxxx npm start dev
+SPOTIFY_CLIENT_ID=xxxxxx SPOTIFY_CLIENT_SECRET=xxxxxx npm start
 ```
+Register `http://127.0.0.1:8888/callback` as redirect URI in the Spotify dashboard (Spotify no longer accepts `localhost`) and open http://127.0.0.1:8888.
+
+Requires Node.js 18 or newer.
 
 ### Running productive (use systemd)
 Create a specific system user which runs the application. In this example it's simply called `spotify`.
