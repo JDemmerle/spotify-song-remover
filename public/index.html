@@ -19,7 +19,10 @@
     </main>
 
     <main id="loggedin" class="app" hidden>
-      <p id="status" class="status" role="status" aria-live="polite">Lade aktuellen Song …</p>
+      <div class="status" role="status" aria-live="polite">
+        <p id="status">Lade aktuellen Song …</p>
+        <p id="info" class="status-info" hidden></p>
+      </div>
       <div class="actions">
         <button type="button" class="btn btn-action btn-remove" id="remove-song-from-playlist">Lösche Song aus Playlist</button>
         <button type="button" class="btn btn-action btn-next" id="next-song">Nächster Song</button>

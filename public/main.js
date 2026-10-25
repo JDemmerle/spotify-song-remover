@@ -6,15 +6,18 @@
   var loginView = document.getElementById('login');
   var appView = document.getElementById('loggedin');
   var statusEl = document.getElementById('status');
+  var infoEl = document.getElementById('info');
   var removeBtn = document.getElementById('remove-song-from-playlist');
   var nextBtn = document.getElementById('next-song');
 
   var access_token = null;
   var refresh_token = null;
 
-  function setStatus(text) {
-    statusEl.textContent = text;
-    statusEl.title = text;
+  // Main status line plus an optional second line, e.g. the removed song
+  function setStatus(text, info) {
+    statusEl.textContent = statusEl.title = text;
+    infoEl.textContent = infoEl.title = info || '';
+    infoEl.hidden = !info;
   }
 
   function storage(action, value) {
@@ -105,9 +108,30 @@
     return song.artists ? song.name + ' – ' + song.artists : song.name;
   }
 
-  async function showCurrentSong() {
+  function sleep(ms) {
+    return new Promise(function(resolve) { setTimeout(resolve, ms); });
+  }
+
+  async function showCurrentSong(info) {
     var song = await getCurrentSong();
-    setStatus(song ? 'Läuft: ' + songLabel(song) : 'Aktuell läuft kein Song');
+    setStatus(song ? 'Läuft: ' + songLabel(song) : 'Aktuell läuft kein Song', info);
+    return song;
+  }
+
+  // Spotify needs a moment until the new song is reported as playing,
+  // so poll until a different song than previousUri shows up
+  async function showNextSong(previousUri, info) {
+    setStatus('Lade nächsten Song …', info);
+    for (var attempt = 0; attempt < 5; attempt++) {
+      await sleep(400);
+      try {
+        var song = await showCurrentSong(info);
+        if (!song || song.uri !== previousUri) return;
+      } catch (error) {
+        console.warn('Aktueller Song konnte nicht geladen werden:', error);
+      }
+    }
+    setStatus('Nächster Song', info);
   }
 
   function handleError(error) {
@@ -161,18 +185,13 @@
     }
 
     await skipToNextSong();
-    setStatus('Entfernt: ' + songLabel(song));
+    await showNextSong(song.uri, 'Entfernt: ' + songLabel(song));
   }));
 
   nextBtn.addEventListener('click', withLock(async function() {
+    var song = await getCurrentSong().catch(function() { return null; });
     await skipToNextSong();
-    // Spotify needs a moment until the new song is reported as playing
-    setTimeout(function() {
-      showCurrentSong().catch(function(error) {
-        console.warn('Aktueller Song konnte nicht geladen werden:', error);
-        setStatus('Nächster Song');
-      });
-    }, 500);
+    await showNextSong(song && song.uri);
   }));
 
   async function initializeApp() {
