@@ -68,14 +68,24 @@
       await refreshAccessToken();
       return spotifyRequest(endpoint, method, data, true);
     }
+    var body = await parseJson(response);
     if (!response.ok) {
-      var body = await response.json().catch(function() { return {}; });
-      throw new ApiError(response.status, (body.error && body.error.message) || response.statusText);
+      var message = (body && body.error && body.error.message) || response.statusText || 'Fehler';
+      console.error((method || 'GET') + ' ' + endpoint + ' → ' + response.status, body);
+      throw new ApiError(response.status, message + ' (' + response.status + ' bei ' + endpoint + ')');
     }
-    // 204 No Content, e.g. when nothing is playing
-    if (response.status === 204) return null;
-    var text = await response.text();
-    return text ? JSON.parse(text) : null;
+    return body;
+  }
+
+  // Player commands (e.g. me/player/next) answer with an empty or non-JSON body
+  async function parseJson(response) {
+    var text = await response.text().catch(function() { return ''; });
+    if (!text) return null;
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      return null;
+    }
   }
 
   async function getCurrentSong() {
@@ -157,7 +167,12 @@
   nextBtn.addEventListener('click', withLock(async function() {
     await skipToNextSong();
     // Spotify needs a moment until the new song is reported as playing
-    setTimeout(function() { showCurrentSong().catch(handleError); }, 500);
+    setTimeout(function() {
+      showCurrentSong().catch(function(error) {
+        console.warn('Aktueller Song konnte nicht geladen werden:', error);
+        setStatus('Nächster Song');
+      });
+    }, 500);
   }));
 
   async function initializeApp() {
